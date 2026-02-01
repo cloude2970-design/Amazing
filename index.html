@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vita Mahjong Web - 🏗️ 挖机制作</title>
+    <style>
+        :root {
+            --tile-width: 60px;
+            --tile-height: 80px;
+            --tile-depth: 5px; /* 3D 厚度 */
+            --bg-color: #263238; /* 更深的背景，突出白色瓷砖 */
+            --tile-bg: #ffffff;
+            --tile-shadow: #cfd8dc;
+            --highlight-color: #ffee58;
+            --locked-filter: grayscale(0.8) brightness(0.7);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-header {
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            background: #37474f;
+            color: #80cea4;
+            font-size: 24px;
+            font-weight: 900;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+        }
+
+        #board {
+            position: relative;
+            width: 600px;
+            height: 500px;
+            transform: rotateX(10deg); /* 微微倾斜增加3D感 */
+        }
+
+        .tile {
+            position: absolute;
+            width: var(--tile-width);
+            height: var(--tile-height);
+            background-color: var(--tile-bg);
+            border: 2px solid #455a64;
+            border-radius: 6px;
+            /* 3D 侧边效果 */
+            box-shadow: 
+                1px 1px 0 #90a4ae,
+                2px 2px 0 #90a4ae,
+                3px 3px 0 #90a4ae,
+                4px 4px 5px rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 45px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s ease;
+        }
+
+        .tile.selected {
+            background-color: var(--highlight-color);
+            transform: translate(-2px, -4px);
+            box-shadow: 4px 6px 12px rgba(255, 235, 59, 0.5);
+            z-index: 999 !important;
+        }
+
+        .tile.locked {
+            filter: var(--locked-filter);
+            cursor: not-allowed;
+        }
+
+        #controls {
+            padding: 25px;
+            display: flex;
+            gap: 20px;
+            background: #37474f;
+            width: 100%;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            background: #80cea4;
+            color: #263238;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #569675;
+        }
+        
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #569675;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-header">🏗️ VITA MAHJONG 3D 🏗️</div>
+    <div id="game-container">
+        <div id="board"></div>
+    </div>
+    <div id="controls">
+        <button onclick="initGame()">重新洗牌</button>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const tilesData = ['🀄', '🀅', '🀆', '🀇', '🀈', '🀉', '🀊', '🀋', '🀌', '🀝', '🀞', '🀟', '🀀', '🀁', '🀂', '🀃', '🀐', '🀑'];
+        let selectedTile = null;
+        let allTiles = [];
+
+        // 3D 布局定义 [row, col, layer]
+        // 这是一个简化的金字塔布局
+        function getLayout() {
+            const layout = [];
+            // Layer 0 (Bottom): 6x6
+            for(let r=0; r<6; r++) {
+                for(let c=0; c<6; c++) {
+                    layout.push({r, c, l: 0});
+                }
+            }
+            // Layer 1: 4x4 (centered)
+            for(let r=1; r<5; r++) {
+                for(let c=1; c<5; c++) {
+                    layout.push({r: r+0.2, c: c+0.2, l: 1});
+                }
+            }
+            // Layer 2: 2x2
+            for(let r=2; r<4; r++) {
+                for(let c=2; c<4; c++) {
+                    layout.push({r: r+0.4, c: c+0.4, l: 2});
+                }
+            }
+            // Layer 3 (Top): 1x1
+            layout.push({r: 2.6, c: 2.6, l: 3});
+            
+            return layout;
+        }
+
+        function isLocked(tile) {
+            const t = tile.dataset;
+            const r = parseFloat(t.r);
+            const c = parseFloat(t.c);
+            const l = parseInt(t.l);
+
+            // 1. 上层是否有压住
+            const hasAbove = allTiles.some(other => {
+                const o = other.dataset;
+                return parseInt(o.l) > l && 
+                       Math.abs(parseFloat(o.r) - r) < 0.8 && 
+                       Math.abs(parseFloat(o.c) - c) < 0.8;
+            });
+            if (hasAbove) return true;
+
+            // 2. 左右是否都被封死
+            const hasLeft = allTiles.some(other => {
+                const o = other.dataset;
+                return parseInt(o.l) === l && 
+                       Math.abs(parseFloat(o.r) - r) < 0.5 && 
+                       (parseFloat(o.c) < c && parseFloat(o.c) > c - 1.1);
+            });
+            const hasRight = allTiles.some(other => {
+                const o = other.dataset;
+                return parseInt(o.l) === l && 
+                       Math.abs(parseFloat(o.r) - r) < 0.5 && 
+                       (parseFloat(o.c) > c && parseFloat(o.c) < c + 1.1);
+            });
+
+            return hasLeft && hasRight;
+        }
+
+        function updateLockedState() {
+            allTiles.forEach(tile => {
+                if (isLocked(tile)) {
+                    tile.classList.add('locked');
+                } else {
+                    tile.classList.remove('locked');
+                }
+            });
+        }
+
+        function handleTileClick(tile) {
+            if (tile.classList.contains('locked')) return;
+
+            if (selectedTile === tile) {
+                tile.classList.remove('selected');
+                selectedTile = null;
+                return;
+            }
+
+            if (selectedTile) {
+                if (selectedTile.dataset.val === tile.dataset.val) {
+                    // 消除
+                    tile.remove();
+                    selectedTile.remove();
+                    allTiles = allTiles.filter(t => t !== tile && t !== selectedTile);
+                    selectedTile = null;
+                    updateLockedState();
+                } else {
+                    selectedTile.classList.remove('selected');
+                    tile.classList.add('selected');
+                    selectedTile = tile;
+                }
+            } else {
+                tile.classList.add('selected');
+                selectedTile = tile;
+            }
+        }
+
+        function initGame() {
+            board.innerHTML = '';
+            allTiles = [];
+            const layout = getLayout();
+            
+            // 准备成对的牌
+            let pairs = [];
+            const neededPairs = Math.floor(layout.length / 2);
+            for(let i=0; i<neededPairs; i++) {
+                const val = tilesData[i % tilesData.length];
+                pairs.push(val, val);
+            }
+            if (layout.length % 2 !== 0) pairs.push(tilesData[0]);
+            pairs.sort(() => Math.random() - 0.5);
+
+            layout.forEach((pos, i) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.innerHTML = pairs[i];
+                tile.dataset.val = pairs[i];
+                tile.dataset.r = pos.r;
+                tile.dataset.c = pos.c;
+                tile.dataset.l = pos.l;
+                
+                // 计算 3D 位置
+                const x = pos.c * 70;
+                const y = pos.r * 90;
+                const zOffset = pos.l * 8; // 每层向上抬高
+                
+                tile.style.left = `${x}px`;
+                tile.style.top = `${y}px`;
+                tile.style.transform = `translateZ(${zOffset}px)`;
+                tile.style.zIndex = pos.l * 10;
+                
+                tile.onclick = () => handleTileClick(tile);
+                board.appendChild(tile);
+                allTiles.push(tile);
+            });
+
+            updateLockedState();
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
