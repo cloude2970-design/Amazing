@@ -17,21 +17,30 @@
         .tile.locked { filter: contrast(0.5) brightness(0.2); cursor: not-allowed; opacity: 0.4; }
         .tile.hint { outline: 4px solid var(--gold); animation: pulse 1s infinite; }
         @keyframes pulse { 50% { opacity: 0.5; } }
-        #onboarding-overlay, #success-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        #onboarding-overlay, #success-overlay, #leaderboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .step-box { max-width: 320px; padding: 40px; border: 1px solid #444; background: #1c1917; }
         .step-text { font-size: 18px; margin-bottom: 30px; letter-spacing: 2px; color: #d6d3d1; }
         footer { padding: 30px; display: flex; justify-content: center; gap: 15px; }
         .zen-btn { padding: 10px 25px; background: transparent; border: 1px solid #444; color: #78716c; font-size: 12px; letter-spacing: 3px; cursor: pointer; transition: 0.3s; }
         .zen-btn:hover { color: #fafaf9; border-color: #a8a29e; }
+        .leaderboard-list { text-align: left; width: 100%; margin: 20px 0; font-family: monospace; }
+        .leaderboard-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #333; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="onboarding-overlay"><div class="step-box"><div id="step-msg" class="step-text">Welcome to Mahjong Zen.</div><button class="zen-btn" id="next-step">BEGIN</button></div></div>
     <div id="success-overlay"></div>
+    <div id="leaderboard-overlay">
+        <div class="step-box">
+            <div class="step-text">LEADERBOARD</div>
+            <div id="leaderboard-content" class="leaderboard-list"></div>
+            <button class="zen-btn" onclick="document.getElementById('leaderboard-overlay').style.display='none'">CLOSE</button>
+        </div>
+    </div>
     <header>
-        <div class="zen-title">MAHJONG ZEN</div>
-        <div style="font-size: 11px; letter-spacing: 4px; margin-top:5px;">LEVEL: <span id="level-num">1</span> | TILES: <span id="count">0</span></div>
+        <div class="zen-title" style="cursor:pointer" onclick="showLeaderboard()">MAHJONG ZEN</div>
+        <div style="font-size: 11px; letter-spacing: 4px; margin-top:5px;">LEVEL: <span id="level-num">1</span> | TIME: <span id="timer">00:00</span></div>
     </header>
     <div id="game-area"><div id="board"></div></div>
     <footer><button class="zen-btn" onclick="undo()">UNDO</button><button class="zen-btn" onclick="showHint()">HINT</button><button class="zen-btn" onclick="init()">RESET</button></footer>
@@ -57,6 +66,41 @@
 
         let currentLevel = parseInt(localStorage.getItem('zenLevel')) || 1;
         let selected = null; let all = []; let history = []; let audioCtx = null;
+        let startTime = null; let timerInterval = null;
+
+        function updateTimer() {
+            if(!startTime) return;
+            const now = Date.now();
+            const diff = Math.floor((now - startTime) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+        }
+
+        function saveScore(time) {
+            let scores = JSON.parse(localStorage.getItem('zenScores') || '[]');
+            scores.push({ level: currentLevel, time: time, date: new Date().toLocaleDateString() });
+            scores.sort((a, b) => a.time - b.time);
+            localStorage.setItem('zenScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        function showLeaderboard() {
+            const overlay = document.getElementById('leaderboard-overlay');
+            const content = document.getElementById('leaderboard-content');
+            let scores = JSON.parse(localStorage.getItem('zenScores') || '[]');
+            
+            if(scores.length === 0) {
+                content.innerHTML = '<div style="text-align:center">No records yet.</div>';
+            } else {
+                content.innerHTML = scores.map((s, i) => `
+                    <div class="leaderboard-item">
+                        <span>#${i+1} LVL ${s.level}</span>
+                        <span>${Math.floor(s.time/60).toString().padStart(2,'0')}:${(s.time%60).toString().padStart(2,'0')}</span>
+                    </div>
+                `).join('');
+            }
+            overlay.style.display = 'flex';
+        }
 
         function initAudio() { if(!audioCtx) audioCtx = new(window.AudioContext||window.webkitAudioContext)(); }
         function playZenSound(f, type="sine", d=0.5, v=0.02) {
@@ -84,9 +128,20 @@
         }
 
         function showSuccess() {
+            clearInterval(timerInterval);
+            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+            saveScore(timeTaken);
+            
             const s = document.getElementById('success-overlay');
             s.style.display = 'flex';
-            s.innerHTML = `<div class="step-box"><div class="step-text">LEVEL ${currentLevel} COMPLETE</div><button class="zen-btn" onclick="nextLevel()">NEXT LEVEL</button></div>`;
+            s.innerHTML = `
+                <div class="step-box">
+                    <div class="step-text">LEVEL ${currentLevel} COMPLETE</div>
+                    <div style="color:var(--gold);margin-bottom:20px">TIME: ${document.getElementById('timer').innerText}</div>
+                    <button class="zen-btn" onclick="nextLevel()">NEXT LEVEL</button>
+                    <button class="zen-btn" style="margin-top:10px;border:none" onclick="showLeaderboard()">VIEW LEADERBOARD</button>
+                </div>
+            `;
             playZenSound(800, "triangle", 1.5, 0.05);
         }
 
@@ -136,6 +191,10 @@
 
         function init() {
             board.innerHTML = ''; all = []; history = [];
+            clearInterval(timerInterval);
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+            
             levelEl.innerText = currentLevel;
             const config = LEVELS[currentLevel] || LEVELS[1];
             const layout = config.layout();
