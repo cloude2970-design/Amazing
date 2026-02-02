@@ -180,6 +180,23 @@
             for(let i=0; i<free.length; i++) for(let j=i+1; j<free.length; j++) if(free[i].dataset.v === free[j].dataset.v) { free[i].classList.add('hint'); free[j].classList.add('hint'); return; }
         }
 
+        function isSolvable() {
+            // 🏗️ 核心算法：深度预判死局
+            const tempAll = [...all];
+            const tempValues = tempAll.map(t => t.dataset.v);
+            
+            // 检查当前是否有可消除的对子
+            const freeTiles = tempAll.filter(t => !isLocked(t));
+            const freeValues = freeTiles.map(t => t.dataset.v);
+            
+            const counts = {};
+            for(const v of freeValues) {
+                counts[v] = (counts[v] || 0) + 1;
+                if(counts[v] >= 2) return true; // 只要能找到一对，暂时就不算死局
+            }
+            return false;
+        }
+
         function init() {
             board.innerHTML = ''; all = []; history = [];
             clearInterval(timerInterval); startTime = Date.now();
@@ -187,34 +204,43 @@
             modeEl.innerText = currentMode; levelEl.innerText = currentLevel;
             
             const layout = (LEVELS[currentLevel] || LEVELS[1]).layout();
-            
-            // 🏗️ 修复逻辑：确保总数是偶数且牌面完全配对
             let totalTiles = layout.length;
-            if(totalTiles % 2 !== 0) {
-                layout.pop(); // 如果是奇数，强行去掉一个，确保能成对
-                totalTiles = layout.length;
-            }
+            if(totalTiles % 2 !== 0) { layout.pop(); totalTiles = layout.length; }
 
+            // 循环生成，直到预判开局可解
             let pool = [];
-            let pairsNeeded = totalTiles / 2;
-            for(let i=0; i<pairsNeeded; i++) {
-                const v = mahjongs[i % mahjongs.length];
-                pool.push(v, v); // 强制加入一对
-            }
-            
-            // 随机洗牌
-            pool.sort(() => Math.random() - 0.5);
+            let attempts = 0;
+            const maxAttempts = 50;
 
-            layout.forEach((p, i) => {
-                const t = document.createElement('div'); t.className = 'tile';
-                t.innerHTML = `<span class="symbol">${pool[i]}</span>`;
-                Object.assign(t.dataset, {v:pool[i], r:p.r, c:p.c, l:p.l});
-                // 微调间距防止重叠感过强
-                t.style.left = `${p.c * 72 + 50}px`; t.style.top = `${p.r * 82 + 30}px`;
-                t.style.transform = `translateZ(${p.l * 12}px)`; t.style.zIndex = p.l * 10;
-                t.onclick = () => handle(t); board.appendChild(t); all.push(t);
+            do {
+                pool = [];
+                let pairsNeeded = totalTiles / 2;
+                for(let i=0; i<pairsNeeded; i++) {
+                    const v = mahjongs[i % mahjongs.length];
+                    pool.push(v, v);
+                }
+                pool.sort(() => Math.random() - 0.5);
+                
+                // 预填入测试
+                board.innerHTML = '';
+                all = [];
+                layout.forEach((p, i) => {
+                    const t = document.createElement('div'); t.className = 'tile';
+                    t.innerHTML = `<span class="symbol">${pool[i]}</span>`;
+                    Object.assign(t.dataset, {v:pool[i], r:p.r, c:p.c, l:p.l});
+                    t.style.left = `${p.c * 72 + 50}px`; t.style.top = `${p.r * 82 + 30}px`;
+                    t.style.transform = `translateZ(${p.l * 12}px)`; t.style.zIndex = p.l * 10;
+                    board.appendChild(t); all.push(t);
+                });
+                attempts++;
+            } while (!isSolvable() && attempts < maxAttempts);
+
+            // 绑定真正的事件
+            all.forEach(t => {
+                t.onclick = () => handle(t);
+                t.classList.toggle('locked', isLocked(t));
             });
-            all.forEach(t => t.classList.toggle('locked', isLocked(t)));
+            refresh();
         }
         if(!localStorage.getItem('zenDone')) { document.getElementById('onboarding-overlay').style.display = 'flex'; document.getElementById('next-step').onclick = () => { localStorage.setItem('zenDone','1'); document.getElementById('onboarding-overlay').style.display='none'; init(); }; }
         else { init(); }
