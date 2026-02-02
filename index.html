@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MAHJONG ZEN</title>
+    <title>MAHJONG ZEN - DUAL MODES</title>
     <style>
         :root { --t-w: 62px; --t-h: 84px; --zen-bg: #0c0a09; --ivory: #f5f5f4; --gold: #d97706; }
         body { margin: 0; background: var(--zen-bg); font-family: "Palatino", serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #a8a29e; }
-        header { padding: 20px; text-align: center; border-bottom: 1px solid #292524; background: rgba(0,0,0,0.4); }
-        .zen-title { font-size: 24px; font-weight: 200; letter-spacing: 10px; color: #fafaf9; }
+        header { padding: 15px; text-align: center; border-bottom: 1px solid #292524; background: rgba(0,0,0,0.4); }
+        .zen-title { font-size: 22px; font-weight: 200; letter-spacing: 8px; color: #fafaf9; margin-bottom: 5px; cursor: pointer; }
         #game-area { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; perspective: 1200px; }
         #board { position: relative; width: 400px; height: 500px; transform: rotateX(10deg); transform-style: preserve-3d; transition: opacity 0.5s; }
         .tile { position: absolute; width: var(--t-w); height: var(--t-h); background: var(--ivory); border-radius: 4px; display: flex; justify-content: center; align-items: center; cursor: pointer; border: 1.5px solid #1c1917; box-shadow: 0 1px 0 #d6d3d1, 1px 2px 0 #d6d3d1, 2px 3px 0 #78716c, 4px 10px 25px rgba(0,0,0,0.8); transition: all 0.3s ease; }
@@ -17,152 +17,146 @@
         .tile.locked { filter: contrast(0.5) brightness(0.2); cursor: not-allowed; opacity: 0.4; }
         .tile.hint { outline: 4px solid var(--gold); animation: pulse 1s infinite; }
         @keyframes pulse { 50% { opacity: 0.5; } }
-        #onboarding-overlay, #success-overlay, #leaderboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        #onboarding-overlay, #success-overlay, #leaderboard-overlay, #mode-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .step-box { max-width: 320px; padding: 40px; border: 1px solid #444; background: #1c1917; }
         .step-text { font-size: 18px; margin-bottom: 30px; letter-spacing: 2px; color: #d6d3d1; }
-        footer { padding: 30px; display: flex; justify-content: center; gap: 15px; }
-        .zen-btn { padding: 10px 25px; background: transparent; border: 1px solid #444; color: #78716c; font-size: 12px; letter-spacing: 3px; cursor: pointer; transition: 0.3s; }
+        footer { padding: 25px; display: flex; justify-content: center; gap: 10px; border-top: 1px solid #222; }
+        .zen-btn { padding: 10px 20px; background: transparent; border: 1px solid #444; color: #78716c; font-size: 11px; letter-spacing: 2px; cursor: pointer; transition: 0.3s; }
         .zen-btn:hover { color: #fafaf9; border-color: #a8a29e; }
-        .leaderboard-list { text-align: left; width: 100%; margin: 20px 0; font-family: monospace; }
+        .mode-active { color: var(--gold) !important; border-color: var(--gold) !important; }
+        .leaderboard-list { text-align: left; width: 100%; margin: 20px 0; font-family: monospace; font-size: 12px; }
         .leaderboard-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #333; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
+    <div id="mode-overlay" style="display:flex">
+        <div class="step-box">
+            <div class="step-text">SELECT MODE</div>
+            <button class="zen-btn" style="width:100%;margin-bottom:15px" onclick="setMode('ZEN')">ZEN: Endless Journey</button>
+            <button class="zen-btn" style="width:100%" onclick="setMode('TIME_ATTACK')">TIME ATTACK: 3-Level Rush</button>
+        </div>
+    </div>
     <div id="onboarding-overlay"><div class="step-box"><div id="step-msg" class="step-text">Welcome to Mahjong Zen.</div><button class="zen-btn" id="next-step">BEGIN</button></div></div>
     <div id="success-overlay"></div>
     <div id="leaderboard-overlay">
         <div class="step-box">
-            <div class="step-text">LEADERBOARD</div>
+            <div class="step-text">HALL OF FAME</div>
             <div id="leaderboard-content" class="leaderboard-list"></div>
             <button class="zen-btn" onclick="document.getElementById('leaderboard-overlay').style.display='none'">CLOSE</button>
         </div>
     </div>
     <header>
-        <div class="zen-title" style="cursor:pointer" onclick="showLeaderboard()">MAHJONG ZEN</div>
-        <div style="font-size: 11px; letter-spacing: 4px; margin-top:5px;">LEVEL: <span id="level-num">1</span> | TIME: <span id="timer">00:00</span></div>
+        <div class="zen-title" onclick="showLeaderboard()">MAHJONG ZEN</div>
+        <div id="game-status" style="font-size: 10px; letter-spacing: 2px;">
+            MODE: <span id="display-mode" style="color:var(--gold)">-</span> | 
+            LVL: <span id="level-num">1</span> | 
+            TIME: <span id="timer">00:00</span>
+        </div>
     </header>
     <div id="game-area"><div id="board"></div></div>
-    <footer><button class="zen-btn" onclick="undo()">UNDO</button><button class="zen-btn" onclick="showHint()">HINT</button><button class="zen-btn" onclick="init()">RESET</button></footer>
+    <footer>
+        <button class="zen-btn" onclick="undo()">UNDO</button>
+        <button class="zen-btn" onclick="showHint()">HINT</button>
+        <button class="zen-btn" onclick="document.getElementById('mode-overlay').style.display='flex'">MODES</button>
+        <button class="zen-btn" onclick="init()">RESET</button>
+    </footer>
     <script>
         const board = document.getElementById('board'); const countEl = document.getElementById('count');
-        const levelEl = document.getElementById('level-num');
+        const levelEl = document.getElementById('level-num'); const timerEl = document.getElementById('timer');
+        const modeEl = document.getElementById('display-mode');
         const mahjongs = ['🀄','🀅','🀆','🀇','🀈','🀉','🀊','🀋','🀌','🀝','🀞','🀟','🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀙','🀚','🀛'];
         
         const LEVELS = {
-            1: { name: "Zen Start", layout: () => {
-                const l = []; for(let r=0;r<4;r++) for(let c=0;c<4;c++) l.push({r,c,l:0}); return l;
-            }},
-            2: { name: "Twin Pillars", layout: () => {
-                const l = []; for(let r=0;r<6;r++) { l.push({r,c:0,l:0},{r,c:3,l:0}); }
-                for(let r=1;r<5;r++) { l.push({r,c:0.5,l:1},{r,c:2.5,l:1}); } return l;
-            }},
-            3: { name: "The Fortress", layout: () => {
-                const l = []; for(let r=0;r<6;r++) for(let c=0;c<4;c++) l.push({r,c,l:0});
-                for(let r=1;r<5;r++) for(let c=1;c<3;c++) l.push({r:r+0.2,c:c+0.2,l:1});
-                for(let r=2;r<4;r++) l.push({r:r+0.4,c:1.7,l:2}); return l;
-            }}
+            1: { layout: () => { const l = []; for(let r=0;r<4;r++) for(let c=0;c<4;c++) l.push({r,c,l:0}); return l; }},
+            2: { layout: () => { const l = []; for(let r=0;r<6;r++) { l.push({r,c:0,l:0},{r,c:3,l:0}); } for(let r=1;r<5;r++) { l.push({r,c:0.5,l:1},{r,c:2.5,l:1}); } return l; }},
+            3: { layout: () => { const l = []; for(let r=0;r<6;r++) for(let c=0;c<4;c++) l.push({r,c,l:0}); for(let r=1;r<5;r++) for(let c=1;c<3;c++) l.push({r:r+0.2,c:c+0.2,l:1}); for(let r=2;r<4;r++) l.push({r:r+0.4,c:1.7,l:2}); return l; }}
         };
 
-        let currentLevel = parseInt(localStorage.getItem('zenLevel')) || 1;
+        let currentMode = localStorage.getItem('zenActiveMode') || 'ZEN';
+        let currentLevel = 1;
+        let totalLevelsCleared = parseInt(localStorage.getItem('zenTotalCleared')) || 0;
         let selected = null; let all = []; let history = []; let audioCtx = null;
-        let startTime = null; let timerInterval = null;
-
-        function updateTimer() {
-            if(!startTime) return;
-            const now = Date.now();
-            const diff = Math.floor((now - startTime) / 1000);
-            const m = Math.floor(diff / 60).toString().padStart(2, '0');
-            const s = (diff % 60).toString().padStart(2, '0');
-            document.getElementById('timer').innerText = `${m}:${s}`;
-        }
-
-        function saveScore(time) {
-            let scores = JSON.parse(localStorage.getItem('zenScores') || '[]');
-            scores.push({ level: currentLevel, time: time, date: new Date().toLocaleDateString() });
-            scores.sort((a, b) => a.time - b.time);
-            localStorage.setItem('zenScores', JSON.stringify(scores.slice(0, 10)));
-        }
-
-        function showLeaderboard() {
-            const overlay = document.getElementById('leaderboard-overlay');
-            const content = document.getElementById('leaderboard-content');
-            let scores = JSON.parse(localStorage.getItem('zenScores') || '[]');
-            
-            if(scores.length === 0) {
-                content.innerHTML = '<div style="text-align:center">No records yet.</div>';
-            } else {
-                content.innerHTML = scores.map((s, i) => `
-                    <div class="leaderboard-item">
-                        <span>#${i+1} LVL ${s.level}</span>
-                        <span>${Math.floor(s.time/60).toString().padStart(2,'0')}:${(s.time%60).toString().padStart(2,'0')}</span>
-                    </div>
-                `).join('');
-            }
-            overlay.style.display = 'flex';
-        }
+        let startTime = null; let timerInterval = null; let speedrunStartTime = null;
 
         function initAudio() { if(!audioCtx) audioCtx = new(window.AudioContext||window.webkitAudioContext)(); }
         function playZenSound(f, type="sine", d=0.5, v=0.02) {
             initAudio(); const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
             o.type = type; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-            g.gain.setValueAtTime(v, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + d);
-            o.connect(g); g.connect(audioCtx.destination);
-            o.start(); o.stop(audioCtx.currentTime + d);
+            g.gain.setValueAtTime(v, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + d);
+            o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
         }
 
-        function isLocked(t) {
-            const {r,c,l} = t.dataset;
-            const up = all.some(o => o.dataset.l > l && Math.abs(o.dataset.r-r)<0.7 && Math.abs(o.dataset.c-c)<0.7);
-            if(up) return true;
-            const left = all.some(o => o.dataset.l == l && Math.abs(o.dataset.r-r)<0.5 && o.dataset.c < c && o.dataset.c > c-1.1);
-            const right = all.some(o => o.dataset.l == l && Math.abs(o.dataset.r-r)<0.5 && o.dataset.c > c && o.dataset.c < c+1.1);
-            return left && right;
+        function setMode(mode) {
+            currentMode = mode; localStorage.setItem('zenActiveMode', mode);
+            document.getElementById('mode-overlay').style.display = 'none';
+            currentLevel = 1; speedrunStartTime = Date.now();
+            init();
         }
 
-        function hasMoves() {
-            const free = all.filter(t => !isLocked(t));
-            for(let i=0; i<free.length; i++) for(let j=i+1; j<free.length; j++) if(free[i].dataset.v === free[j].dataset.v) return true;
-            return false;
+        function updateTimer() {
+            if(!startTime) return;
+            const diff = Math.floor((Date.now() - (currentMode === 'TIME_ATTACK' ? speedrunStartTime : startTime)) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            timerEl.innerText = `${m}:${s}`;
         }
 
         function showSuccess() {
             clearInterval(timerInterval);
-            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-            saveScore(timeTaken);
+            const timeTaken = Math.floor((Date.now() - (currentMode === 'TIME_ATTACK' ? speedrunStartTime : startTime)) / 1000);
             
+            if(currentMode === 'ZEN') {
+                totalLevelsCleared++;
+                localStorage.setItem('zenTotalCleared', totalLevelsCleared);
+                saveScore('ZEN', totalLevelsCleared);
+            }
+
             const s = document.getElementById('success-overlay');
             s.style.display = 'flex';
-            s.innerHTML = `
-                <div class="step-box">
-                    <div class="step-text">LEVEL ${currentLevel} COMPLETE</div>
-                    <div style="color:var(--gold);margin-bottom:20px">TIME: ${document.getElementById('timer').innerText}</div>
-                    <button class="zen-btn" onclick="nextLevel()">NEXT LEVEL</button>
-                    <button class="zen-btn" style="margin-top:10px;border:none" onclick="showLeaderboard()">VIEW LEADERBOARD</button>
-                </div>
+            
+            if(currentMode === 'TIME_ATTACK' && currentLevel === 3) {
+                saveScore('SPEEDRUN', timeTaken);
+                s.innerHTML = `<div class="step-box"><div class="step-text">SPEEDRUN COMPLETE</div><div style="color:var(--gold)">TIME: ${timerEl.innerText}</div><button class="zen-btn" onclick="setMode('TIME_ATTACK')">RETRY</button></div>`;
+            } else {
+                s.innerHTML = `<div class="step-box"><div class="step-text">LEVEL COMPLETE</div><button class="zen-btn" onclick="nextLevel()">CONTINUE</button></div>`;
+            }
+            playZenSound(880, "triangle", 1, 0.03);
+        }
+
+        function saveScore(type, val) {
+            let key = type === 'ZEN' ? 'zenScores_Endless' : 'zenScores_Speedrun';
+            let scores = JSON.parse(localStorage.getItem(key) || '[]');
+            scores.push({ val: val, date: new Date().toLocaleDateString() });
+            scores.sort((a,b) => type === 'ZEN' ? b.val - a.val : a.val - b.val);
+            localStorage.setItem(key, JSON.stringify(scores.slice(0,5)));
+        }
+
+        function showLeaderboard() {
+            const overlay = document.getElementById('leaderboard-overlay');
+            const content = document.getElementById('leaderboard-content');
+            let s1 = JSON.parse(localStorage.getItem('zenScores_Endless') || '[]');
+            let s2 = JSON.parse(localStorage.getItem('zenScores_Speedrun') || '[]');
+            
+            content.innerHTML = `
+                <div style="color:var(--gold);margin-bottom:5px">ENDLESS (Levels)</div>
+                ${s1.map(s=>`<div class="leaderboard-item"><span>${s.date}</span><span>${s.val} Lvl</span></div>`).join('')}
+                <div style="color:var(--gold);margin-top:15px;margin-bottom:5px">SPEEDRUN (Time)</div>
+                ${s2.map(s=>`<div class="leaderboard-item"><span>${s.date}</span><span>${s.val}s</span></div>`).join('')}
             `;
-            playZenSound(800, "triangle", 1.5, 0.05);
+            overlay.style.display = 'flex';
         }
 
         function nextLevel() {
-            currentLevel = LEVELS[currentLevel + 1] ? currentLevel + 1 : 1;
-            localStorage.setItem('zenLevel', currentLevel);
+            currentLevel = LEVELS[currentLevel + 1] ? currentLevel + 1 : (currentMode === 'ZEN' ? Math.floor(Math.random()*3)+1 : 1);
             document.getElementById('success-overlay').style.display = 'none';
             init();
         }
 
-        function refresh() { 
-            all.forEach(t => { t.classList.remove('hint'); t.classList.toggle('locked', isLocked(t)); });
-            countEl.innerText = all.length;
-            if(all.length === 0) showSuccess();
-            else if(!hasMoves()) { setTimeout(() => { alert("No moves. Reshuffling..."); reshuffle(); }, 500); }
-        }
-
-        function reshuffle() {
-            let pool = all.map(t => t.dataset.v).sort(() => Math.random() - 0.5);
-            all.forEach((t, i) => { t.dataset.v = pool[i]; t.querySelector('.symbol').innerText = pool[i]; });
-            if(!hasMoves()) reshuffle(); refresh();
+        function isLocked(t) {
+            const {r,c,l} = t.dataset; const up = all.some(o => o.dataset.l > l && Math.abs(o.dataset.r-r)<0.7 && Math.abs(o.dataset.c-c)<0.7);
+            if(up) return true; const left = all.some(o => o.dataset.l == l && Math.abs(o.dataset.r-r)<0.5 && o.dataset.c < c && o.dataset.c > c-1.1);
+            const right = all.some(o => o.dataset.l == l && Math.abs(o.dataset.r-r)<0.5 && o.dataset.c > c && o.dataset.c < c+1.1); return left && right;
         }
 
         function handle(t) {
@@ -173,50 +167,41 @@
                 if(selected.dataset.v === t.dataset.v) {
                     history.push([selected, t]); t.remove(); selected.remove();
                     all = all.filter(x => x!==t && x!==selected); selected = null;
-                    playZenSound(880, "triangle", 1, 0.02); refresh();
+                    playZenSound(800, "triangle", 1.2, 0.03); 
+                    all.forEach(t => t.classList.toggle('locked', isLocked(t)));
+                    if(all.length === 0) showSuccess();
                 } else { selected.classList.remove('selected'); t.classList.add('selected'); selected = t; }
             } else { t.classList.add('selected'); selected = t; }
         }
 
-        function undo() {
-            if(!history.length) return;
-            const last = history.pop(); last.forEach(t => { board.appendChild(t); all.push(t); });
-            playZenSound(300); refresh();
-        }
-
+        function undo() { if(!history.length) return; const last = history.pop(); last.forEach(t => { board.appendChild(t); all.push(t); }); all.forEach(t => t.classList.toggle('locked', isLocked(t))); }
         function showHint() {
-            const free = all.filter(t => !isLocked(t));
+            all.forEach(t => t.classList.remove('hint')); const free = all.filter(t => !isLocked(t));
             for(let i=0; i<free.length; i++) for(let j=i+1; j<free.length; j++) if(free[i].dataset.v === free[j].dataset.v) { free[i].classList.add('hint'); free[j].classList.add('hint'); return; }
         }
 
         function init() {
             board.innerHTML = ''; all = []; history = [];
-            clearInterval(timerInterval);
-            startTime = Date.now();
+            clearInterval(timerInterval); startTime = Date.now();
             timerInterval = setInterval(updateTimer, 1000);
+            modeEl.innerText = currentMode; levelEl.innerText = currentLevel;
             
-            levelEl.innerText = currentLevel;
-            const config = LEVELS[currentLevel] || LEVELS[1];
-            const layout = config.layout();
+            const layout = (LEVELS[currentLevel] || LEVELS[1]).layout();
             let pool = []; let n = Math.floor(layout.length/2);
             for(let i=0; i<n; i++) { const v = mahjongs[i % mahjongs.length]; pool.push(v,v); }
             if(layout.length % 2) pool.push(mahjongs[0]);
             pool.sort(() => Math.random() - 0.5);
             layout.forEach((p, i) => {
-                const t = document.createElement('div'); t.className = 'tile';
-                t.innerHTML = `<span class="symbol">${pool[i]}</span>`;
+                const t = document.createElement('div'); t.className = 'tile'; t.innerHTML = `<span class="symbol">${pool[i]}</span>`;
                 Object.assign(t.dataset, {v:pool[i], r:p.r, c:p.c, l:p.l});
                 t.style.left = `${p.c * 72 + 50}px`; t.style.top = `${p.r * 78 + 30}px`;
                 t.style.transform = `translateZ(${p.l * 12}px)`; t.style.zIndex = p.l * 10;
                 t.onclick = () => handle(t); board.appendChild(t); all.push(t);
             });
-            refresh();
-            if(!localStorage.getItem('zenDone')) { 
-                document.getElementById('onboarding-overlay').style.display = 'flex';
-                document.getElementById('next-step').onclick = () => { localStorage.setItem('zenDone','1'); document.getElementById('onboarding-overlay').style.display='none'; };
-            }
+            all.forEach(t => t.classList.toggle('locked', isLocked(t)));
         }
-        init();
+        if(!localStorage.getItem('zenDone')) { document.getElementById('onboarding-overlay').style.display = 'flex'; document.getElementById('next-step').onclick = () => { localStorage.setItem('zenDone','1'); document.getElementById('onboarding-overlay').style.display='none'; init(); }; }
+        else { init(); }
     </script>
 </body>
 </html>
